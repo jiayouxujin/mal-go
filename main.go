@@ -3,35 +3,56 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"github.com/jiayouxujin/mal-go/printer"
+	"github.com/jiayouxujin/mal-go/reader"
+	"github.com/jiayouxujin/mal-go/types"
 	"os"
 )
 
-func READ() (string, error) {
-	reader := bufio.NewReader(os.Stdin)
-	text, err := reader.ReadString('\n')
+func READ() (types.MalType, error) {
+	in := bufio.NewReader(os.Stdin)
+	fmt.Print("user> ")
+	text, err := in.ReadString('\n')
 	if err != nil {
 		return "", err
 	}
-	return text, nil
+	ast, err := reader.ReadStr(text)
+	if err != nil {
+		return "", err
+	}
+	return ast, nil
 }
 
-func EVAL(text string) string {
-	return text
+func EVAL(ast types.MalType) (types.MalType, error) {
+	return ast, nil
 }
 
-func PRINT(text string) {
-	fmt.Print(text)
+func PRINT(exp types.MalType) (string, error) {
+	return printer.PrStr(exp, true), nil
 }
 
-func rep() {
-	text, _ := READ()
-	res := EVAL(text)
-	PRINT(res)
+func rep() (types.MalType, error) {
+	var exp types.MalType
+	var res string
+	var e error
+	if exp, e = READ(); e != nil {
+		return nil, e
+	}
+	if exp, e = EVAL(exp); e != nil {
+		return nil, e
+	}
+	if res, e = PRINT(exp); e != nil {
+		return nil, e
+	}
+	return res, nil
 }
 
 func main() {
 	for {
-		fmt.Print("user> ")
-		rep()
+		out, err := rep()
+		if err != nil {
+			fmt.Printf("Error: %v\n", err)
+		}
+		fmt.Printf("%v\n", out)
 	}
 }
