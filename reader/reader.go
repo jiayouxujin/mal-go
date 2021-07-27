@@ -145,7 +145,11 @@ func readVector(r Reader) (types.MalType, error) {
 	if err != nil {
 		return nil, err
 	}
-	return list, nil
+	res := types.MalVector{}
+	for _, item := range list {
+		res = append(res, item)
+	}
+	return res, nil
 }
 
 func readHashmap(r Reader) (types.MalType, error) {

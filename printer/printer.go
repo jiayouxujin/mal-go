@@ -50,7 +50,7 @@ func PrStr(data types.MalType, readable bool) string {
 	case types.MalList: //(foo bar)
 		return printList(t, "(", ")", readable)
 	case types.MalVector: //[foo bar]
-		return printList(types.MalList{t}, "[", "]", readable)
+		return printList(types.MalList(t), "[", "]", readable)
 	case types.MalHashmap:
 		return printHashmap(t, readable)
 	default:
