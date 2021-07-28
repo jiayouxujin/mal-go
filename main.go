@@ -109,8 +109,9 @@ func main() {
 	for {
 		out, err := rep()
 		if err != nil {
-			fmt.Printf("Error: %v\n", err)
+			fmt.Printf("%v\n", err)
+		} else {
+			fmt.Printf("%v\n", out)
 		}
-		fmt.Printf("%v\n", out)
 	}
 }
