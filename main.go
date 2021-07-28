@@ -36,7 +36,7 @@ func evalAst(ast MalType, env map[string]MalFunction) (MalType, error) {
 		if fun, ok := env[t.Value]; ok {
 			return fun, nil
 		}
-		return nil, fmt.Errorf("doesn't support function")
+		return nil, fmt.Errorf("failed to look up '%s' in environments", t.Value)
 	case MalList:
 		evaluatedList := make(MalList, 0)
 		for _, ori := range t {
