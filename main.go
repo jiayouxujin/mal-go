@@ -1,39 +1,26 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
-	"github.com/jiayouxujin/mal-go/core"
+	"github.com/jiayouxujin/mal-go/env"
 	"github.com/jiayouxujin/mal-go/printer"
 	"github.com/jiayouxujin/mal-go/reader"
+	"github.com/jiayouxujin/mal-go/readline"
 	. "github.com/jiayouxujin/mal-go/types"
-	"os"
 )
 
-var replEnv = map[string]MalType{
-	"+": func() {
-
-	},
-}
-
-func READ() (MalType, error) {
-	in := bufio.NewReader(os.Stdin)
-	fmt.Print("user> ")
-	text, err := in.ReadString('\n')
-	if err != nil {
-		return "", err
-	}
-	ast, err := reader.ReadStr(text)
+func READ(input string) (MalType, error) {
+	ast, err := reader.ReadStr(input)
 	if err != nil {
 		return "", err
 	}
 	return ast, nil
 }
 
-func evalAst(ast MalType, env map[string]MalFunction) (MalType, error) {
+func evalAst(ast MalType, env *env.Env) (MalType, error) {
 	switch t := ast.(type) {
 	case MalSymbol:
-		if fun, ok := env[t.Value]; ok {
+		if fun, err := env.Get(t); err == nil {
 			return fun, nil
 		}
 		return nil, fmt.Errorf("failed to look up '%s' in environments", t.Value)
@@ -67,21 +54,66 @@ func evalAst(ast MalType, env map[string]MalFunction) (MalType, error) {
 		return ast, nil
 	}
 }
-func EVAL(ast MalType, env map[string]MalFunction) (MalType, error) {
-	switch t := ast.(type) {
-	case MalList:
-		if len(t) == 0 {
-			return t, nil //ast is empty list return ast unchanged
-		} else {
-			evaluatedList, err := evalAst(ast, env)
-			if err != nil {
-				return nil, err
+func EVAL(ast MalType, e *env.Env) (MalType, error) {
+	for{
+		switch t := ast.(type) {
+		case MalList:
+			if len(t) == 0 {
+				return t, nil //ast is empty list return ast unchanged
 			}
-			f := evaluatedList.(MalList)[0].(MalFunction)
-			return f(evaluatedList.(MalList)[1:]...)
+			first := ""
+			if symbol, ok := t[0].(MalSymbol); ok {
+				first = symbol.Value
+			}
+			switch first {
+			case "def!":
+				if len(t) != 3 {
+					return nil, fmt.Errorf("incorrect number of parameters for 'def!'")
+				}
+				k, ok := t[1].(MalSymbol)
+				if !ok {
+					return nil, fmt.Errorf("the first parameter is expected to be a symbol")
+				}
+				v, err := EVAL(t[2], e)
+				if err != nil {
+					return nil, err
+				}
+				err = e.Set(k, v)
+				return v, err
+			case "let*":
+				if len(t) != 3 {
+					return nil, fmt.Errorf("incorrect number of arguments for 'let*'")
+				}
+				bindings, ok := t[1].(MalList)
+				if !ok || len(bindings)%2 != 0 {
+					return nil, fmt.Errorf("the first parameter is expected to be a list of even length")
+				}
+				tmpEnv, _ := env.CreateEnv(e, nil, nil)
+				for i := 0; i < len(bindings); i += 2 {
+					k, ok := bindings[i].(MalSymbol)
+					if !ok {
+						return nil, fmt.Errorf("invalid symbol(s) in variable bindings")
+					}
+					v, err := EVAL(bindings[i+1], tmpEnv)
+					if err != nil {
+						return nil, err
+					}
+					err = tmpEnv.Set(k, v)
+					if err != nil {
+						return nil, err
+					}
+				}
+				ast, e = t[2], tmpEnv
+			default:
+				evaluatedList, err := evalAst(t, e)
+				if err != nil {
+					return nil, err
+				}
+				return evaluatedList.(MalList)[0].(MalFunction)(evaluatedList.(MalList)[1:]...)
+			}
+		default: //ast is not a list,call evalAst
+			return evalAst(ast, e)
 		}
-	default: //ast is not a list,call evalAst
-		return evalAst(ast, env)
 	}
 }
 
@@ -89,14 +121,14 @@ func PRINT(exp MalType) (string, error) {
 	return printer.PrStr(exp, true), nil
 }
 
-func rep() (MalType, error) {
+func rep(input string, replEnv *env.Env) (MalType, error) {
 	var exp MalType
 	var res string
 	var e error
-	if exp, e = READ(); e != nil {
+	if exp, e = READ(input); e != nil {
 		return nil, e
 	}
-	if exp, e = EVAL(exp, core.NameSpace); e != nil {
+	if exp, e = EVAL(exp, replEnv); e != nil {
 		return nil, e
 	}
 	if res, e = PRINT(exp); e != nil {
@@ -106,12 +138,19 @@ func rep() (MalType, error) {
 }
 
 func main() {
+	defer readline.Close()
+
+	replEnv := env.GetInitEnv()
 	for {
-		out, err := rep()
+		input, err := readline.PromptAndRead("user> ")
+		if err != nil {
+			break
+		}
+		res, err := rep(input, replEnv)
 		if err != nil {
 			fmt.Printf("%v\n", err)
 		} else {
-			fmt.Printf("%v\n", out)
+			fmt.Printf("%v\n", res)
 		}
 	}
 }
