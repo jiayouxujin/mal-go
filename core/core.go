@@ -57,6 +57,9 @@ func div(args ...types.MalType) (types.MalType, error) {
 	if err != nil {
 		return nil, err
 	}
+	if b == 0 {
+		return nil, fmt.Errorf("division by zero")
+	}
 	return types.MalNumber{
 		Value: a / b,
 	}, nil
