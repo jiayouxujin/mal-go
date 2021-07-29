@@ -104,12 +104,74 @@ func EVAL(ast MalType, e *env.Env) (MalType, error) {
 			}
 			ast, e = t[2], tmpEnv
 			return EVAL(ast, e)
+		case "do":
+			var final MalType
+			var err error
+			for _, exp := range t[1:] {
+				final, err = EVAL(exp, e)
+				if err != nil {
+					return nil, err
+				}
+			}
+			return final, nil
+		case "if":
+			if len(t) == 3 {
+				t = append(t, MalNil)
+			} else if len(t) != 4 {
+				return nil, fmt.Errorf("incorrect number of arguments for 'if'")
+			}
+			condition, err := EVAL(t[1], e)
+			if err != nil {
+				return nil, err
+			}
+			if condition == MalFalse || condition == MalNil {
+				return EVAL(t[3], e)
+			}
+			return EVAL(t[2], e)
+		case "fn*":
+			if len(t) != 3 {
+				return nil, fmt.Errorf("incorret number of arguments for 'fn*'")
+			}
+			params, ok := t[1].(MalList)
+			if !ok {
+				return nil, fmt.Errorf("the first argument should be function parameter list")
+			}
+			for i, v := range params {
+				if _, ok := v.(MalSymbol); !ok {
+					return nil, fmt.Errorf("parameter %d is not a valid symbol", i)
+				}
+			}
+			closure := func(args ...MalType) (MalType, error) {
+				wrappedEnv, err := env.CreateEnv(e, params, args)
+				if err != nil {
+					return nil, err
+				}
+				return EVAL(t[2], wrappedEnv)
+			}
+			return MalFunctionTCO{
+				AST:      t[2],
+				Params:   params,
+				Env:      e,
+				Function: closure,
+			}, nil
 		default:
 			evaluatedList, err := evalAst(t, e)
 			if err != nil {
 				return nil, err
 			}
-			return evaluatedList.(MalList)[0].(MalFunction)(evaluatedList.(MalList)[1:]...)
+			switch f := evaluatedList.(MalList)[0].(type) {
+			case MalFunction:
+				return f(evaluatedList.(MalList)[1:]...)
+			case MalFunctionTCO:
+				ast = f.AST
+				environment, err := env.CreateEnv(f.Env, f.Params, evaluatedList.(MalList)[1:])
+				if err != nil {
+					return nil, err
+				}
+				return EVAL(ast, environment)
+			default:
+				return nil, fmt.Errorf("invalid function calling")
+			}
 		}
 	default: //ast is not a list,call evalAst
 		return evalAst(ast, e)
