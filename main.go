@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/jiayouxujin/mal-go/core"
 	"github.com/jiayouxujin/mal-go/env"
 	"github.com/jiayouxujin/mal-go/printer"
 	"github.com/jiayouxujin/mal-go/reader"
@@ -202,6 +203,7 @@ func main() {
 	defer readline.Close()
 
 	replEnv := env.GetInitEnv()
+	runInitCommands(replEnv)
 	for {
 		input, err := readline.PromptAndRead("user> ")
 		if err != nil {
@@ -213,5 +215,11 @@ func main() {
 		} else {
 			fmt.Printf("%v\n", res)
 		}
+	}
+}
+
+func runInitCommands(replEnv *env.Env) {
+	for _, command := range core.InitCommands {
+		_, _ = rep(command, replEnv)
 	}
 }
